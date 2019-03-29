@@ -46,6 +46,12 @@ using namespace std;
 		this->gameboardOffset = gameboardOffset;
 		this->nextShapeOffset = nextShapeOffset;
 		reset();
+		scoreFont.loadFromFile("fonts/RedOctober.ttf");
+		scoreText.setFont(scoreFont);
+		scoreText.setCharacterSize(24);
+		scoreText.setFillColor(sf::Color::White);
+		scoreText.setPosition(435, 325);
+		setScore(currScore);
 		// currentShape.setShape(Tetromino::getRandomShape());
 		// currentShape.setGridLoc(board.getSpawnLoc());
 		// board.setContent(Gameboard::MAX_X / 2, Gameboard::MAX_Y / 2, 1);
@@ -62,6 +68,8 @@ using namespace std;
 	void TetrisGame::draw() {
 		drawGameboard();
 		drawTetromino(currentShape, gameboardOffset);
+		drawTetromino(nextShape, nextShapeOffset);
+		pWindow->draw(scoreText);
 	}
 
 	// Event and game loop processing
@@ -95,13 +103,19 @@ using namespace std;
 	void TetrisGame::processGameLoop(float secondsSinceLastLoop) {
 		if (shapePlacedSinceLastGameLoop) {
 			if (!spawnNextShape()) {
+				std::cout << "resetting" << endl;
 				reset();
 			}
 			else {
 				pickNextShape();
-				board.removeCompletedRows();
-				setScore(board.getCompletedRowIndices().size());
+				int i = board.removeCompletedRows();
+				prevScore = currScore;
+				currScore += i;
+				setScore(currScore);
+				determineSecsPerTick();
+				
 			}
+			shapePlacedSinceLastGameLoop = false;
 		}
 		secondsSinceLastTick += secondsSinceLastLoop;
 		if (secondsSinceLastTick > secsPerTick) {
@@ -133,9 +147,12 @@ using namespace std;
 	//  - pick & spawn next shape
 	//  - pick next shape again
 	void TetrisGame::reset() {
-		score = 0;
+		currScore = 0;
+		prevScore = 0;
 		determineSecsPerTick();
+		board.empty();
 		drawGameboard();
+		setScore(currScore);
 		pickNextShape();
 		spawnNextShape();
 	}
@@ -257,7 +274,8 @@ using namespace std;
 	// form a string "score: ##" to include the current score
 	// user scoreText.setString() to display it.
 	void TetrisGame::setScore(int score) {
-
+		string scoreStr = "score: " + std::to_string(currScore);
+		scoreText.setString(scoreStr);
 	}
 
 	// State & gameplay/logic methods ================================
@@ -301,6 +319,16 @@ using namespace std;
 	//   - basic: use MAX_SECS_PER_TICK
 	//   - advanced: base it on score (higher score results in lower secsPerTick)
 	void TetrisGame::determineSecsPerTick() {
-
+		std::cout << currScore << endl;
+		if (currScore > prevScore) {
+			double newSecsPerTick = secsPerTick - (currScore * 0.05);
+			if (secsPerTick >= MIN_SECS_PER_TICK && newSecsPerTick >= MIN_SECS_PER_TICK) {
+				secsPerTick = newSecsPerTick;
+			}
+			else {
+				secsPerTick = MIN_SECS_PER_TICK;
+			}
+		}
+		std::cout << secsPerTick << endl;
 	}
 

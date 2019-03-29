@@ -163,7 +163,8 @@ private:
 	// MEMBER VARIABLES
 
 	// State members ---------------------------------------------
-	int score = 0;				// the current game score.
+	int currScore = 0;				// the current game score.
+	int prevScore = 0;
     Gameboard board;			// the gameboard (grid) to represent where all the blocks are.
     GridTetromino nextShape;	// the tetromino shape that is "on deck".
     GridTetromino currentShape;	// the tetromino that is currently falling.

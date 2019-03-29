@@ -14,9 +14,11 @@
 #include <vector>
 #include <string>
 
+
+
 enum class TetColor { RED, ORANGE, YELLOW, GREEN, BLUE_LIGHT, BLUE_DARK, PURPLE };
 
-enum class TetShape { SHAPE_S, SHAPE_Z, SHAPE_L, SHAPE_J, SHAPE_O, SHAPE_I, SHAPE_T };
+enum class TetShape { SHAPE_S, SHAPE_Z, SHAPE_L, SHAPE_J, SHAPE_O, SHAPE_I, SHAPE_T, TetshapeCount };
 
 class Tetromino {
 
@@ -36,7 +38,7 @@ public:
 	void setShape(TetShape shape);
 	void rotateCW();
 	void printToConsole();
-
+	static TetShape getRandomShape();
 };
 
 #endif /* TETROMINO_H */

@@ -21,6 +21,7 @@
 
 #include "Gameboard.h"
 #include "GridTetromino.h"
+#include "Tetromino.h"
 #include <SFML/Graphics.hpp>
 #include <iostream>
 using namespace std;
@@ -44,6 +45,10 @@ using namespace std;
 		pBlockSprite = blockSprite;
 		this->gameboardOffset = gameboardOffset;
 		this->nextShapeOffset = nextShapeOffset;
+		reset();
+		// currentShape.setShape(Tetromino::getRandomShape());
+		// currentShape.setGridLoc(board.getSpawnLoc());
+		// board.setContent(Gameboard::MAX_X / 2, Gameboard::MAX_Y / 2, 1);
 	}
 
 
@@ -56,17 +61,53 @@ using namespace std;
 	// includes board, currentShape, nextShape, score
 	void TetrisGame::draw() {
 		drawGameboard();
+		drawTetromino(currentShape, gameboardOffset);
 	}
 
 	// Event and game loop processing
 	// handles keypress events (up, left, right, down, space)
 	void TetrisGame::onKeyPressed(sf::Event event) {
-
+		switch (event.key.code) {
+			case sf::Keyboard::Up:
+				attemptRotate(currentShape);
+				break;
+			case sf::Keyboard::Left: 
+				attemptMove(currentShape,-1,0);
+				break;
+			case sf::Keyboard::Right: 
+				attemptMove(currentShape,1,0);
+				break;
+			case sf::Keyboard::Down:
+				if (!attemptMove(currentShape, 0, 1)) {
+					lock(currentShape);
+					shapePlacedSinceLastGameLoop = true;
+				}
+				break;
+			case sf::Keyboard::Space:
+				drop(currentShape);
+				lock(currentShape);
+				shapePlacedSinceLastGameLoop = true;
+				break;
+		}
 	}
 
 	// called every game loop to handle ticks & tetromino placement (locking)
 	void TetrisGame::processGameLoop(float secondsSinceLastLoop) {
-
+		if (shapePlacedSinceLastGameLoop) {
+			if (!spawnNextShape()) {
+				reset();
+			}
+			else {
+				pickNextShape();
+				board.removeCompletedRows();
+				setScore(board.getCompletedRowIndices().size());
+			}
+		}
+		secondsSinceLastTick += secondsSinceLastLoop;
+		if (secondsSinceLastTick > secsPerTick) {
+			tick();
+			secondsSinceLastTick -= secsPerTick;
+		}
 	}
 
 	// A tick() forces the currentShape to move (if there were no tick,
@@ -75,7 +116,11 @@ using namespace std;
 	// the currentShape (it can move no further), and record the fact that a
 	// shape was placed (using shapePlacedSinceLastGameLoop)
 	void TetrisGame::tick() {
-
+		if (!attemptMove(currentShape, 0, 1)) {
+			lock(currentShape);
+			shapePlacedSinceLastGameLoop = true;
+		}
+		// cout << "ticking" << endl;
 	}
 
 // private:
@@ -88,12 +133,16 @@ using namespace std;
 	//  - pick & spawn next shape
 	//  - pick next shape again
 	void TetrisGame::reset() {
-
+		score = 0;
+		determineSecsPerTick();
+		drawGameboard();
+		pickNextShape();
+		spawnNextShape();
 	}
 
 	// assign nextShape.setShape a new random shape  
 	void TetrisGame::pickNextShape() {
-
+		nextShape.setShape(Tetromino::getRandomShape());
 	}
 
 
@@ -101,7 +150,9 @@ using namespace std;
 	//   its loc to be the gameboard's spawn loc.
 	//	 - return true/false based on isPositionLegal()
 	bool TetrisGame::spawnNextShape() {
-		return true;
+		currentShape = nextShape;
+		currentShape.setGridLoc(board.getSpawnLoc());
+		return (isPositionLegal(currentShape));
 	}
 
 
@@ -115,7 +166,15 @@ using namespace std;
 	//      if so - rotate the original tetromino.
 	//	 4) return true/false to indicate successful movement
 	bool TetrisGame::attemptRotate(GridTetromino &shape) {
-		return true;
+		
+		GridTetromino tet = currentShape;
+		tet.rotateCW();
+		if (isPositionLegal(tet)) {
+			shape.rotateCW();
+			return true;
+		}
+		return false;
+		
 	}
 
 
@@ -127,14 +186,20 @@ using namespace std;
 	//      if so - move the original.
 	//	 4) return true/false to indicate successful movement
 	bool TetrisGame::attemptMove(GridTetromino &shape, int x, int y) {
-		return true;
+		GridTetromino tet = currentShape;
+		tet.move(x, y);
+		if (isPositionLegal(tet)) {
+			shape.move(x, y);
+			return true;
+		}
+		return false;
 	}
 
 
 	// drops the tetromino vertically as far as it can 
 	//   legally go.  Use attemptMove(). This can be done in 1 line.
 	void TetrisGame::drop(GridTetromino &shape) {
-
+		while (attemptMove(shape, 0, 1)) {}
 	}
 
 	// copy the contents of the tetromino's mapped block locs to the grid.
@@ -142,7 +207,8 @@ using namespace std;
 	//	 2) iterate on the mapped block locs and copy the contents (color) 
 	//      of each to the grid (via gameboard.setGridContent()) 
 	void TetrisGame::lock(const GridTetromino &shape) {
-
+		std::vector<Point> tetLocs = shape.getBlockLocsMappedToGrid();
+		board.setContent(tetLocs, static_cast<int>(currentShape.getColor()));
 	}
 
 	// Graphics methods ==============================================
@@ -169,7 +235,7 @@ using namespace std;
 		for (int y = 0; y < board.MAX_Y; y++) {
 			for (int x = 0; x < board.MAX_X; x++) {
 				if (board.getContent(x, y) != board.EMPTY_BLOCK) {
-					drawBlock(x, y, TetColor::BLUE_DARK, gameboardOffset);
+					drawBlock(x, y, static_cast<TetColor>(board.getContent(x,y)), gameboardOffset);
 				}
 			}
 		}
@@ -181,7 +247,10 @@ using namespace std;
 	//   If the Tetromino is on the gameboard: use gameboardOffset (otherwise you 
 	//   can specify another point as the origin - for the nextShape)
 	void TetrisGame::drawTetromino(GridTetromino tetromino, Point origin) {
-
+		std::vector<Point> tetLocs = tetromino.getBlockLocsMappedToGrid();
+		for (Point loc : tetLocs) {
+			drawBlock(loc.getX(), loc.getY(), tetromino.getColor(), origin);
+		}
 	}
 
 	// set the score, update the score display
@@ -196,12 +265,24 @@ using namespace std;
 	// return true if shape is within borders (isShapeWithinBorders())
 	//	 and doesn't intersect locked blocks (doesShapeIntersectLockedBlocks)
 	bool TetrisGame::isPositionLegal(const GridTetromino &shape) {
-		return true;
+		if (isShapeWithinBorders(shape) && !doesShapeIntersectLockedBlocks(shape)) {
+			return true;
+		}
+		return false;
 	}
 
 	// return true if the shape is within the left, right,
 	//	 and lower border of the grid. (false otherwise)
 	bool TetrisGame::isShapeWithinBorders(const GridTetromino &shape) {
+		std::vector<Point> tetLocs = shape.getBlockLocsMappedToGrid();
+		for (Point loc : tetLocs) {
+			if (loc.getX() < board.MAX_X && loc.getX() >= 0 && loc.getY() < board.MAX_Y) {
+				continue;
+			}
+			else {
+				return false;
+			}
+		}
 		return true;
 	}
 
@@ -209,7 +290,11 @@ using namespace std;
 	//   contains anything other than Gameboard::EMPTY_BLOCK. (false otherwise)	
 	//   hint Use Gameboard's areLocsEmpty() for this.
 	bool TetrisGame::doesShapeIntersectLockedBlocks(const GridTetromino &shape) {
-		return false;
+		std::vector<Point> tetLocs = shape.getBlockLocsMappedToGrid();
+		if (board.areLocsEmpty(tetLocs)) {
+			return false;
+		}
+		return true;
 	}
 
 	// set secsPerTick 

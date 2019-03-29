@@ -10,6 +10,11 @@
 #include "Point.h"
 #include <iostream>
 
+TetShape Tetromino::getRandomShape() {
+	int tetItem = rand() % static_cast<int>(TetShape::TetshapeCount);
+	return static_cast<TetShape>(tetItem);
+}
+
 Tetromino::Tetromino() 
 {
 	setShape(TetShape::SHAPE_S);
